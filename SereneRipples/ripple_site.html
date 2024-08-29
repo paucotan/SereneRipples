@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serene Ripples</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB, #E0F6FF);
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .slider-container {
+            margin-bottom: 10px;
+        }
+        label {
+            display: inline-block;
+            width: 120px;
+        }
+        #colorToggle {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #colorToggle:hover {
+            background-color: #45a049;
+        }
+        #creditButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #creditWindow {
+            display: none;
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            width: 300px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        #creditWindow a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        #creditWindow a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="rippleCanvas"></canvas>
+    <div id="controls">
+        <div class="slider-container">
+            <label for="intensitySlider">Intensity:</label>
+            <input type="range" id="intensitySlider" min="1" max="10" value="1">
+            <span id="intensityValue">1</span>
+        </div>
+        <div class="slider-container">
+            <label for="durationSlider">Duration:</label>
+            <input type="range" id="durationSlider" min="1" max="10" value="5">
+            <span id="durationValue">5s</span>
+        </div>
+        <div class="slider-container">
+            <label for="autoRippleSlider">Auto Ripples:</label>
+            <input type="range" id="autoRippleSlider" min="0" max="10" value="0">
+            <span id="autoRippleValue">0/s</span>
+        </div>
+        <button id="colorToggle">Color Mode: Frequency</button>
+    </div>
+    <button id="creditButton">i</button>
+    <div id="creditWindow">
+        <p>Serene Ripples is a meditative app designed for enjoying music as if listening to it next to a lake. It provides a visual representation of sound waves and creates a calming, immersive experience.</p>
+        <p>Developed by Paul Cohen (<a href="https://twitter.com/enjoypolosfu" target="_blank">@enjoypolosfu</a>) in collaboration with Cursor AI and with the assistance of Claude 3.5 Sonnet.</p>
+        <p>For an optimal experience, <a href="https://www.youtube.com/watch?v=wygy721nzRc" target="_blank">click here to enjoy Chopin's beautiful music</a> while watching the mesmerizing ripples on the pond.</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('rippleCanvas');
+        const ctx = canvas.getContext('2d');
+        const intensitySlider = document.getElementById('intensitySlider');
+        const durationSlider = document.getElementById('durationSlider');
+        const intensityValue = document.getElementById('intensityValue');
+        const durationValue = document.getElementById('durationValue');
+        const autoRippleSlider = document.getElementById('autoRippleSlider');
+        const autoRippleValue = document.getElementById('autoRippleValue');
+        const colorToggle = document.getElementById('colorToggle');
+        const creditButton = document.getElementById('creditButton');
+        const creditWindow = document.getElementById('creditWindow');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let ripples = [];
+        let autoRippleInterval;
+        let colorMode = 'frequency';
+        let audioVolume = 0;
+        let lastAudioLevel = 0;
+        const SENSITIVITY = 0.01; // Adjust this value to fine-tune sensitivity
+
+        function getRandomColor() {
+            return `hsl(${Math.random() * 360}, 100%, 50%)`;
+        }
+
+        function getColorByFrequency(frequency) {
+            // Use a wider range of frequencies for more color variation
+            const hue = (frequency / 20) * 360; // Changed from 10 to 20
+            return `hsl(${hue}, 100%, 50%)`;
+        }
+
+        function createRipple(x, y, volume = 0) {
+            const baseIntensity = parseInt(intensitySlider.value);
+            const duration = parseInt(durationSlider.value);
+            const frequency = Math.random() * 20;
+            
+            // Calculate intensity based on volume, with a minimum of baseIntensity
+            const intensity = Math.max(baseIntensity, baseIntensity + (volume * 9));
+            
+            const color = colorMode === 'random' ? getRandomColor() : getColorByFrequency(frequency);
+            
+            ripples.push({
+                x: x,
+                y: y,
+                radius: 0,
+                alpha: 1,
+                lineWidth: 1 + (intensity * 0.2), // Adjust line width based on intensity
+                speed: 0.5 + (intensity * 0.25), // Adjust speed based on intensity
+                maxRadius: 100 + (intensity * 30),
+                startTime: Date.now(),
+                duration: duration * 1000, // Convert to milliseconds
+                color: color,
+                frequency: frequency
+            });
+        }
+
+        function createRandomRipple(volume) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            createRipple(x, y, volume);
+        }
+
+        function startAutoRipples(frequency) {
+            clearInterval(autoRippleInterval);
+            if (frequency > 0) {
+                autoRippleInterval = setInterval(createRandomRipple, 1000 / frequency);
+            }
+        }
+
+        function drawRipples() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const currentTime = Date.now();
+
+            ripples.forEach((ripple, index) => {
+                const elapsedTime = currentTime - ripple.startTime;
+                const progress = Math.min(elapsedTime / ripple.duration, 1);
+
+                // Smooth fade out effect
+                const fadeOutProgress = Math.pow(progress, 0.5); // Adjust power for fade curve
+                const alpha = Math.max(0, 1 - fadeOutProgress);
+
+                ctx.beginPath();
+                ctx.arc(ripple.x, ripple.y, ripple.radius, 0, 2 * Math.PI);
+                ctx.strokeStyle = ripple.color.replace(')', `, ${alpha})`).replace('hsl', 'hsla');
+                ctx.lineWidth = ripple.lineWidth;
+                ctx.stroke();
+
+                ripple.radius += ripple.speed;
+
+                if (progress >= 1) {
+                    ripples.splice(index, 1);
+                }
+            });
+
+            requestAnimationFrame(drawRipples);
+        }
+
+        canvas.addEventListener('click', (event) => {
+            createRipple(event.clientX, event.clientY);
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                event.preventDefault();
+                createRandomRipple();
+            }
+        });
+
+        // Audio ripple generation
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                const audioContext = new AudioContext();
+                const analyser = audioContext.createAnalyser();
+                const microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                analyser.fftSize = 2048; // Increased for better frequency resolution
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                function checkAudio() {
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    // Focus on the frequency range of a piano (approximately 27.5 Hz to 4186 Hz)
+                    const pianoRange = dataArray.slice(1, 150); // Adjust these values based on your sample rate
+                    const currentLevel = pianoRange.reduce((a, b) => a + b) / pianoRange.length;
+                    
+                    audioVolume = currentLevel / 255; // Normalize to 0-1 range
+                    
+                    // Detect sudden increases in volume (likely key strikes)
+                    if (currentLevel - lastAudioLevel > SENSITIVITY * 255) {
+                        createRandomRipple(audioVolume);
+                    }
+                    
+                    lastAudioLevel = currentLevel;
+                    requestAnimationFrame(checkAudio);
+                }
+                checkAudio();
+            })
+            .catch(err => console.log('Audio input error: ', err));
+
+        autoRippleSlider.addEventListener('input', () => {
+            const frequency = parseInt(autoRippleSlider.value);
+            autoRippleValue.textContent = frequency + '/s';
+            startAutoRipples(frequency);
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        intensitySlider.addEventListener('input', () => {
+            intensityValue.textContent = intensitySlider.value;
+        });
+
+        durationSlider.addEventListener('input', () => {
+            durationValue.textContent = durationSlider.value + 's';
+        });
+
+        colorToggle.addEventListener('click', () => {
+            colorMode = colorMode === 'random' ? 'frequency' : 'random';
+            colorToggle.textContent = `Color Mode: ${colorMode.charAt(0).toUpperCase() + colorMode.slice(1)}`;
+        });
+
+        creditButton.addEventListener('click', () => {
+            creditWindow.style.display = creditWindow.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Initialize slider values
+        intensityValue.textContent = intensitySlider.value;
+        durationValue.textContent = durationSlider.value + 's';
+        autoRippleValue.textContent = autoRippleSlider.value + '/s';
+
+        drawRipples();
+    </script>
+</body>
+</html>
