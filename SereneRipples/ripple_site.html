@@ -16,12 +16,23 @@
         canvas {
             display: block;
         }
-        #controls {
+        #optionsButton {
             position: absolute;
             top: 10px;
             left: 10px;
-            background: rgba(255, 255, 255, 0.7);
-            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: none;
+            border-radius: 5px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        #optionsMenu {
+            display: none;
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 15px;
             border-radius: 5px;
         }
         .slider-container {
@@ -74,27 +85,64 @@
         #creditWindow a:hover {
             text-decoration: underline;
         }
+        #saveSettings, #resetSettings {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        #saveSettings:hover, #resetSettings:hover {
+            background-color: #45a049;
+        }
+        #backgroundOptions {
+            margin-top: 10px;
+        }
+        #colorPicker {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <canvas id="rippleCanvas"></canvas>
-    <div id="controls">
+    <button id="optionsButton">Options</button>
+    <div id="optionsMenu">
         <div class="slider-container">
             <label for="intensitySlider">Intensity:</label>
-            <input type="range" id="intensitySlider" min="1" max="10" value="1">
-            <span id="intensityValue">1</span>
+            <input type="range" id="intensitySlider" min="1" max="20" value="10">
+            <span id="intensityValue">10</span>
         </div>
         <div class="slider-container">
             <label for="durationSlider">Duration:</label>
-            <input type="range" id="durationSlider" min="1" max="10" value="5">
-            <span id="durationValue">5s</span>
+            <input type="range" id="durationSlider" min="1" max="20" value="10">
+            <span id="durationValue">10s</span>
+        </div>
+        <div class="slider-container">
+            <label for="speedSlider">Speed:</label>
+            <input type="range" id="speedSlider" min="1" max="50" value="25">
+            <span id="speedValue">25</span>
         </div>
         <div class="slider-container">
             <label for="autoRippleSlider">Auto Ripples:</label>
-            <input type="range" id="autoRippleSlider" min="0" max="10" value="0">
-            <span id="autoRippleValue">0/s</span>
+            <input type="range" id="autoRippleSlider" min="0" max="10" value="5">
+            <span id="autoRippleValue">5/s</span>
+        </div>
+        <div class="slider-container">
+            <label for="reverbSlider">Reverb:</label>
+            <input type="range" id="reverbSlider" min="1" max="100" value="50">
+            <span id="reverbValue">50</span>
+        </div>
+        <div id="backgroundOptions">
+            <label for="colorPicker">Background Color:</label>
+            <input type="color" id="colorPicker" value="#87CEEB">
+            <input type="file" id="imageUpload" accept="image/*">
         </div>
         <button id="colorToggle">Color Mode: Frequency</button>
+        <button id="saveSettings">Save Settings</button>
+        <button id="resetSettings">Reset to Default</button>
     </div>
     <button id="creditButton">i</button>
     <div id="creditWindow">
@@ -115,6 +163,16 @@
         const colorToggle = document.getElementById('colorToggle');
         const creditButton = document.getElementById('creditButton');
         const creditWindow = document.getElementById('creditWindow');
+        const optionsButton = document.getElementById('optionsButton');
+        const optionsMenu = document.getElementById('optionsMenu');
+        const reverbSlider = document.getElementById('reverbSlider');
+        const reverbValue = document.getElementById('reverbValue');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const saveSettingsButton = document.getElementById('saveSettings');
+        const resetSettingsButton = document.getElementById('resetSettings');
+        const colorPicker = document.getElementById('colorPicker');
+        const imageUpload = document.getElementById('imageUpload');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -125,6 +183,16 @@
         let audioVolume = 0;
         let lastAudioLevel = 0;
         const SENSITIVITY = 0.01; // Adjust this value to fine-tune sensitivity
+
+        const defaultSettings = {
+            intensity: 10,
+            duration: 10,
+            speed: 7,
+            autoRipple: 3,
+            reverb: 65,
+            colorMode: 'frequency',
+            backgroundColor: '#87CEEB'
+        };
 
         function getRandomColor() {
             return `hsl(${Math.random() * 360}, 100%, 50%)`;
@@ -139,26 +207,28 @@
         function createRipple(x, y, volume = 0) {
             const baseIntensity = parseInt(intensitySlider.value);
             const duration = parseInt(durationSlider.value);
+            const speed = parseInt(speedSlider.value);
             const frequency = Math.random() * 20;
+            const reverbCount = parseInt(reverbSlider.value);
             
-            // Calculate intensity based on volume, with a minimum of baseIntensity
             const intensity = Math.max(baseIntensity, baseIntensity + (volume * 9));
             
             const color = colorMode === 'random' ? getRandomColor() : getColorByFrequency(frequency);
             
-            ripples.push({
-                x: x,
-                y: y,
-                radius: 0,
-                alpha: 1,
-                lineWidth: 1 + (intensity * 0.2), // Adjust line width based on intensity
-                speed: 0.5 + (intensity * 0.25), // Adjust speed based on intensity
-                maxRadius: 100 + (intensity * 30),
-                startTime: Date.now(),
-                duration: duration * 1000, // Convert to milliseconds
-                color: color,
-                frequency: frequency
-            });
+            for (let i = 0; i < reverbCount; i++) {
+                ripples.push({
+                    x: x,
+                    y: y,
+                    alpha: 1 - (i * 0.01),
+                    lineWidth: 1 + (intensity * 0.1) - (i * 0.01),
+                    speed: speed * 0.1, // Increased multiplier for faster speeds
+                    maxRadius: 100 + (intensity * 30) - (i * 1),
+                    startTime: Date.now() + (i * 25),
+                    duration: duration * 1000,
+                    color: color,
+                    frequency: frequency
+                });
+            }
         }
 
         function createRandomRipple(volume) {
@@ -178,26 +248,36 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const currentTime = Date.now();
 
+            const offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = canvas.width * 2;
+            offscreenCanvas.height = canvas.height * 2;
+            const offscreenCtx = offscreenCanvas.getContext('2d');
+            offscreenCtx.scale(2, 2);
+
             ripples.forEach((ripple, index) => {
+                if (currentTime < ripple.startTime) return;
+
                 const elapsedTime = currentTime - ripple.startTime;
                 const progress = Math.min(elapsedTime / ripple.duration, 1);
 
-                // Smooth fade out effect
-                const fadeOutProgress = Math.pow(progress, 0.5); // Adjust power for fade curve
-                const alpha = Math.max(0, 1 - fadeOutProgress);
+                // Calculate the current radius based on progress and speed
+                const currentRadius = ripple.maxRadius * progress * ripple.speed;
 
-                ctx.beginPath();
-                ctx.arc(ripple.x, ripple.y, ripple.radius, 0, 2 * Math.PI);
-                ctx.strokeStyle = ripple.color.replace(')', `, ${alpha})`).replace('hsl', 'hsla');
-                ctx.lineWidth = ripple.lineWidth;
-                ctx.stroke();
+                const fadeOutProgress = Math.pow(progress, 0.5);
+                const alpha = Math.max(0, ripple.alpha * (1 - fadeOutProgress));
 
-                ripple.radius += ripple.speed;
+                offscreenCtx.beginPath();
+                offscreenCtx.arc(ripple.x, ripple.y, currentRadius, 0, 2 * Math.PI);
+                offscreenCtx.strokeStyle = ripple.color.replace(')', `, ${alpha})`).replace('hsl', 'hsla');
+                offscreenCtx.lineWidth = ripple.lineWidth;
+                offscreenCtx.stroke();
 
                 if (progress >= 1) {
                     ripples.splice(index, 1);
                 }
             });
+
+            ctx.drawImage(offscreenCanvas, 0, 0, canvas.width, canvas.height);
 
             requestAnimationFrame(drawRipples);
         }
@@ -264,6 +344,10 @@
             durationValue.textContent = durationSlider.value + 's';
         });
 
+        speedSlider.addEventListener('input', () => {
+            speedValue.textContent = speedSlider.value;
+        });
+
         colorToggle.addEventListener('click', () => {
             colorMode = colorMode === 'random' ? 'frequency' : 'random';
             colorToggle.textContent = `Color Mode: ${colorMode.charAt(0).toUpperCase() + colorMode.slice(1)}`;
@@ -273,10 +357,86 @@
             creditWindow.style.display = creditWindow.style.display === 'none' ? 'block' : 'none';
         });
 
-        // Initialize slider values
-        intensityValue.textContent = intensitySlider.value;
-        durationValue.textContent = durationSlider.value + 's';
-        autoRippleValue.textContent = autoRippleSlider.value + '/s';
+        optionsButton.addEventListener('click', () => {
+            optionsMenu.style.display = optionsMenu.style.display === 'none' ? 'block' : 'none';
+        });
+
+        reverbSlider.addEventListener('input', () => {
+            reverbValue.textContent = reverbSlider.value;
+        });
+
+        function loadSettings() {
+            const savedSettings = JSON.parse(localStorage.getItem('rippleSettings')) || defaultSettings;
+            intensitySlider.value = savedSettings.intensity;
+            durationSlider.value = savedSettings.duration;
+            speedSlider.value = savedSettings.speed;
+            autoRippleSlider.value = savedSettings.autoRipple;
+            reverbSlider.value = savedSettings.reverb;
+            colorMode = savedSettings.colorMode;
+            colorPicker.value = savedSettings.backgroundColor;
+            colorToggle.textContent = `Color Mode: ${colorMode.charAt(0).toUpperCase() + colorMode.slice(1)}`;
+            updateSliderValues();
+            applyBackgroundColor(savedSettings.backgroundColor);
+        }
+
+        function saveSettings() {
+            const settings = {
+                intensity: intensitySlider.value,
+                duration: durationSlider.value,
+                speed: speedSlider.value,
+                autoRipple: autoRippleSlider.value,
+                reverb: reverbSlider.value,
+                colorMode: colorMode,
+                backgroundColor: colorPicker.value
+            };
+            localStorage.setItem('rippleSettings', JSON.stringify(settings));
+            alert('Settings saved!');
+        }
+
+        function resetSettings() {
+            Object.assign(defaultSettings, { backgroundColor: colorPicker.value });
+            localStorage.setItem('rippleSettings', JSON.stringify(defaultSettings));
+            loadSettings();
+            alert('Settings reset to default!');
+        }
+
+        function updateSliderValues() {
+            intensityValue.textContent = intensitySlider.value;
+            durationValue.textContent = durationSlider.value + 's';
+            speedValue.textContent = speedSlider.value;
+            autoRippleValue.textContent = autoRippleSlider.value + '/s';
+            reverbValue.textContent = reverbSlider.value;
+        }
+
+        function applyBackgroundColor(color) {
+            document.body.style.background = color;
+        }
+
+        colorPicker.addEventListener('input', (event) => {
+            applyBackgroundColor(event.target.value);
+        });
+
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.body.style.backgroundImage = `url('${e.target.result}')`;
+                    document.body.style.backgroundSize = 'cover';
+                    document.body.style.backgroundPosition = 'center';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        saveSettingsButton.addEventListener('click', saveSettings);
+        resetSettingsButton.addEventListener('click', resetSettings);
+
+        // Load settings on page load
+        loadSettings();
+
+        // Start auto ripples based on loaded settings
+        startAutoRipples(parseInt(autoRippleSlider.value));
 
         drawRipples();
     </script>
